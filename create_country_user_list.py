@@ -11,10 +11,11 @@ import requests
 
 # Dataset filenames
 d: str = path.dirname(__file__) if "__file__" in locals() else os.getcwd()
-dataset_file: str = path.join(d, 'data17-10-2019-18-35.csv') # Export of Google Forms list
+dataset_file: str = path.join(d, 'data18-10-2019-22-42.csv') # Export of Google Forms list
 key_file: str = path.join(d, 'osuapikey.txt') # Literal key
 country_file: str = path.join(d, 'iso3166-alpha-2.csv') # Bundled with this file hopefully
 out_data_file: str = path.join(d, 'userdata.json') # Created to avoid fetching user info repeatedly
+figure_file: str = path.join(d, 'Figure_1.png')
 
 # Relevant dataset columns
 AVATAR_OPTION: int = 1
@@ -80,6 +81,13 @@ def read_dict_from_json(filename: str) -> Dict:
     with open(filename, encoding='utf-8') as file:
         return json.load(file)
 
+def remove_empty_values(data: Dict) -> Dict:
+    temp_data = dict(data)
+    for k, v in data.items():
+        if v == {}:
+            temp_data.pop(k, None)
+    return temp_data
+
 # API Key
 OSU_API_KEY: str = get_file_as_string(key_file)
 
@@ -94,28 +102,28 @@ COUNTRIES: Dict[str, str] = get_countries(country_file)
 full_users = read_dict_from_json(out_data_file)
 
 # Remove invalid users
-temp_users = dict(full_users)
-for k, v in full_users.items():
-    if v == {}:
-        temp_users.pop(k, None)
-full_users = temp_users
+full_users = remove_empty_values(full_users)
 
 user_countries: Dict[str, str] = {}
 for user, info in full_users.items():
     user_countries[user] = COUNTRIES[info["country"]]
 
 counts = Counter(user_countries.values())
-counts = OrderedDict(counts.most_common()) # sort countries
-# autopct='%1.1f%%'
+counts = OrderedDict(counts.most_common()) # sort countries and convert to dict
+
+COUNTRIES_TO_SHOW_MIN_PERCENT: float = 0.7
+PERCENTAGES_TO_SHOW_MIN: float = 2.0
+
 percents = [i / len(user_countries) * 100.0 for i in counts.values()]
 legend_labels = [f'{i} - {j:.2f}%' for i, j in zip(counts.keys(), percents)]
-pie_labels = [f'{i}' if j > 0.7 else '' for i, j in zip(counts.keys(), percents)]
+pie_labels = [f'{i}' if j > COUNTRIES_TO_SHOW_MIN_PERCENT else '' for i, j in zip(counts.keys(), percents)]
 
-def my_autopct(pct):
-    return ('%1.2f%%' % pct) if pct > 3 else ''
+def custom_autopct(pct):
+    return f'{pct:.2f}%' if pct > PERCENTAGES_TO_SHOW_MIN else ''
 
-patches, texts, _ = plt.pie(counts.values(), labels=pie_labels, autopct=my_autopct, startangle=90)
+patches, texts, _ = plt.pie(counts.values(), labels=pie_labels, autopct=custom_autopct, startangle=90)
 
-plt.legend(patches, legend_labels, loc="center right", title="Países del megacollab", fontsize = 6)
+plt.legend(patches, legend_labels, bbox_to_anchor=(1.5, 1.5), loc=2, title="Participating countries", fontsize = 6)
 plt.axis('equal')
 plt.show()
+#plt.savefig(figure_file, dpi=400, bbox_inches='tight')
